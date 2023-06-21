@@ -921,14 +921,15 @@ namespace WinAuth
 								{
 									PictureBox imageBox = FindControl<PictureBox>(tradePanel, "tradeImage");
 									imageBox.Image = Image.FromStream(ms);
-								}
+                                    imageBox.SizeMode = PictureBoxSizeMode.StretchImage;
+                                }
 							}
 						}
 
 						Label label = FindControl<Label>(tradePanel, "tradeLabel");
 						label.Text = trade.Details + Environment.NewLine + trade.Traded + Environment.NewLine + trade.When;
 						label.Tag = trade.Id;
-						label.Click += Trade_Click;
+						//label.Click += Trade_Click;
 
 						MetroButton tradeAcceptButton = FindControl<MetroButton>(tradePanel, "tradeAccept");
 						tradeAcceptButton.Tag = trade.Id;
