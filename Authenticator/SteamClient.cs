@@ -1177,7 +1177,7 @@ namespace WinAuth
 
             JObject confJson = JObject.Parse(html);
             var confTrades = confJson["conf"];
-            if (confJson["success"].Value<string>() == "True" && confTrades.Count() > 0)
+            if (confJson["success"].Value<bool>() == true && confTrades.Count() > 0)
             {
                 foreach (var confTrade in confTrades)
                 {
@@ -1189,7 +1189,7 @@ namespace WinAuth
 
 
                     string tradeType = confTrade["type_name"].Value<string>();
-                    trade.Details = tradeType + " - " + String.Join(Environment.NewLine, confTrade["summary"].Values<String>());
+                    trade.Details = tradeType + " - " + String.Join(Environment.NewLine, confTrade["summary"].Values<string>());
 
                     trade.Traded = confTrade["headline"].Value<string>();
 
