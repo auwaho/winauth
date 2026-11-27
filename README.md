@@ -4,4 +4,4 @@ This is a fork of the archived original WinAuth [repository](https://github.com/
 
 The fixed 3.6.2 version is available on the [releases](https://github.com/auwaho/winauth/releases) page.
 
-Requires [.NET Framework 4.8](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48) to run properly.
+Requires [.NET Framework 4.8](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48) to run. Open `WinAuth.sln` and build. See [COMPILING.md](COMPILING.md).

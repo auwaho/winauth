@@ -350,6 +350,11 @@ namespace WinAuth
 			// extract the DLL from our resources
 			using (var ins = typeof(Authenticator).Assembly.GetManifestResourceStream("WinAuth.Resources." + libraryname))
 			{
+				if (ins == null)
+				{
+					throw new LibraryNotFoundException("Cannot load the YubiKey AddOn: " + libraryname);
+				}
+
 				using (var outs = new FileStream(_libraryPath, FileMode.Create, FileAccess.Write))
 				{
 					var buffer = new byte[4096];
