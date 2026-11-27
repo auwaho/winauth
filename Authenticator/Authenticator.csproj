@@ -41,7 +41,7 @@
       <ExcludeAssets>all</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json" Version="7.0.1" />
-    <PackageReference Include="NLog" Version="4.2.3" />
+    <PackageReference Include="NLog" Version="4.7.15" />
     <Reference Include="BouncyCastle.Crypto">
       <HintPath>$(PkgBouncyCastle)\lib\Net40-Client\BouncyCastle.Crypto.dll</HintPath>
       <Private>True</Private>

@@ -52,20 +52,14 @@
     <PackageReference Include="BouncyCastle" Version="1.7.0" GeneratePathProperty="true">
       <ExcludeAssets>all</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="SharpZipLib" Version="0.86.0" GeneratePathProperty="true">
-      <ExcludeAssets>all</ExcludeAssets>
-    </PackageReference>
-    <PackageReference Include="HtmlRenderer.Core" Version="1.5.0.5" />
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="HtmlRenderer.Core" Version="1.5.0.6" />
     <PackageReference Include="HtmlRenderer.WinForms" Version="1.5.0.6" />
     <PackageReference Include="Newtonsoft.Json" Version="7.0.1" />
-    <PackageReference Include="NLog" Version="4.2.3" />
+    <PackageReference Include="NLog" Version="4.7.15" />
     <PackageReference Include="ZXing.Net" Version="0.14.0.1" />
     <Reference Include="BouncyCastle.Crypto">
       <HintPath>$(PkgBouncyCastle)\lib\Net40-Client\BouncyCastle.Crypto.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="ICSharpCode.SharpZipLib">
-      <HintPath>$(PkgSharpZipLib)\lib\20\ICSharpCode.SharpZipLib.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
