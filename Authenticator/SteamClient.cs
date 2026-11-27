@@ -56,7 +56,7 @@ namespace WinAuth
 		/// <summary>
 		/// Default mobile user agent
 		/// </summary>
-		private const string USERAGENT = "Mozilla/5.0 (Linux; U; Android 4.1.1; en-us; Google Nexus 4 - 4.1.1 - API 16 - 768x1280 Build/JRO03S) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30";
+		private const string USERAGENT = SteamAuth.MobileUserAgent;
 
 		/// <summary>
 		/// Regular expressions for trade confirmations
@@ -480,166 +480,83 @@ namespace WinAuth
 		{
 			// clear error
 			this.Error = null;
-
-			var data = new NameValueCollection();
-			string response;
+			this.InvalidLogin = false;
+			this.RequiresCaptcha = false;
+			this.CaptchaId = null;
+			this.CaptchaUrl = null;
+			this.RequiresEmailAuth = false;
+			this.EmailDomain = null;
+			this.Requires2FA = false;
 
 			if (this.IsLoggedIn() == false)
 			{
-				// get session
-				if (this.Session.Cookies.Count == 0)
-				{
-					// .Net3.5 has a bug in CookieContainer that prepends a "." to the domain, i.e. ".steamcommunity.com"
-					var cookieuri = new Uri(COMMUNITY_BASE + "/");
-					this.Session.Cookies.Add(cookieuri, new Cookie("mobileClientVersion", "3067969+%282.1.3%29"));
-					this.Session.Cookies.Add(cookieuri, new Cookie("mobileClient", "android"));
-					this.Session.Cookies.Add(cookieuri, new Cookie("steamid", ""));
-					this.Session.Cookies.Add(cookieuri, new Cookie("steamLogin", ""));
-					this.Session.Cookies.Add(cookieuri, new Cookie("Steam_Language", "english"));
-					this.Session.Cookies.Add(cookieuri, new Cookie("dob", ""));
-
-					NameValueCollection headers = new NameValueCollection();
-					headers.Add("X-Requested-With", "com.valvesoftware.android.steam.community");
-
-					response = GetString(COMMUNITY_BASE + "/mobilelogin?oauth_client_id=DE45CD61&oauth_scope=read_profile%20write_profile%20read_client%20write_client", "GET", null, headers);
-				}
-
 				// Steam strips any non-ascii chars from username and password
 				username = Regex.Replace(username, @"[^\u0000-\u007F]", string.Empty);
 				password = Regex.Replace(password, @"[^\u0000-\u007F]", string.Empty);
 
-				// get the user's RSA key
-				data.Add("username", username);
-				response = GetString(COMMUNITY_BASE + "/mobilelogin/getrsakey", "POST", data);
-				var rsaresponse = JObject.Parse(response);
-				if (rsaresponse.SelectToken("success").Value<bool>() != true)
+				try
 				{
-					this.InvalidLogin = true;
-					this.Error = "Unknown username";
-					return false;
+					var login = SteamAuth.Login(username, password, this.Authenticator.CurrentCode, null, false, remember);
+					this.Session.SteamId = login.SteamId;
+					this.Session.OAuthToken = login.AccessToken;
+					this.Session.Cookies = login.Cookies;
 				}
-
-				// encrypt password with RSA key
-				RNGCryptoServiceProvider random = new RNGCryptoServiceProvider();
-				string encryptedPassword64;
-				using (var rsa = new RSACryptoServiceProvider())
+				catch (SteamAuth.GuardCodeRequiredException ex)
 				{
-					var passwordBytes = Encoding.ASCII.GetBytes(password);
-					var p = rsa.ExportParameters(false);
-					p.Exponent = StringToByteArray(rsaresponse.SelectToken("publickey_exp").Value<string>());
-					p.Modulus = StringToByteArray(rsaresponse.SelectToken("publickey_mod").Value<string>());
-					rsa.ImportParameters(p);
-					byte[] encryptedPassword = rsa.Encrypt(passwordBytes, false);
-					encryptedPassword64 = Convert.ToBase64String(encryptedPassword);
-				}
-
-				// login request
-				data = new NameValueCollection();
-				data.Add("password", encryptedPassword64);
-				data.Add("username", username);
-				data.Add("twofactorcode", this.Authenticator.CurrentCode);
-				//data.Add("emailauth", string.Empty);
-				data.Add("loginfriendlyname", "#login_emailauth_friendlyname_mobile");
-				data.Add("captchagid", (string.IsNullOrEmpty(captchaId) == false ? captchaId : "-1"));
-				data.Add("captcha_text", (string.IsNullOrEmpty(captchaText) == false ? captchaText : "enter above characters"));
-				//data.Add("emailsteamid", (string.IsNullOrEmpty(emailcode) == false ? this.SteamId ?? string.Empty : string.Empty));
-				data.Add("rsatimestamp", rsaresponse.SelectToken("timestamp").Value<string>());
-				data.Add("remember_login", remember ? "true" : "false");
-				data.Add("oauth_client_id", "DE45CD61");
-				data.Add("oauth_scope", "read_profile write_profile read_client write_client");
-				data.Add("donotache", new DateTime().ToUniversalTime().Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds.ToString());
-				response = GetString(COMMUNITY_BASE + "/mobilelogin/dologin/", "POST", data);
-				Dictionary<string, object> loginresponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(response);
-
-				if (loginresponse.ContainsKey("emailsteamid") == true)
-				{
-					this.Session.SteamId = loginresponse["emailsteamid"] as string;
-				}
-
-                // fixed OAuth
-                string transferparameters = loginresponse["transfer_parameters"].ToString();
-                JObject transferparametersjson = JObject.Parse(transferparameters);
-                string steamid = (string)transferparametersjson["steamid"];
-                string auth = (string)transferparametersjson["auth"];
-
-                this.InvalidLogin = false;
-				this.RequiresCaptcha = false;
-				this.CaptchaId = null;
-				this.CaptchaUrl = null;
-				this.RequiresEmailAuth = false;
-				this.EmailDomain = null;
-				this.Requires2FA = false;
-
-				//if (loginresponse.ContainsKey("login_complete") == false || (bool)loginresponse["login_complete"] == false || loginresponse.ContainsKey("oauth") == false)
-				if (loginresponse.ContainsKey("login_complete") == false || (bool)loginresponse["login_complete"] == false || string.IsNullOrEmpty(auth))
-				{
-					this.InvalidLogin = true;
-
-					// require captcha
-					if (loginresponse.ContainsKey("captcha_needed") == true && (bool)loginresponse["captcha_needed"] == true)
+					if (ex.Email == true)
 					{
-						this.RequiresCaptcha = true;
-						this.CaptchaId = (string)loginresponse["captcha_gid"];
-						this.CaptchaUrl = COMMUNITY_BASE + "/public/captcha.php?gid=" + this.CaptchaId;
-					}
-
-					// require email auth
-					if (loginresponse.ContainsKey("emailauth_needed") == true && (bool)loginresponse["emailauth_needed"] == true)
-					{
-						if (loginresponse.ContainsKey("emaildomain") == true)
-						{
-							var emaildomain = (string)loginresponse["emaildomain"];
-							if (string.IsNullOrEmpty(emaildomain) == false)
-							{
-								this.EmailDomain = emaildomain;
-							}
-						}
 						this.RequiresEmailAuth = true;
+						this.EmailDomain = EmailDomainFrom(ex.EmailAddress);
+						this.Error = "Email code required";
 					}
-
-					// require email auth
-					if (loginresponse.ContainsKey("requires_twofactor") == true && (bool)loginresponse["requires_twofactor"] == true)
+					else
 					{
 						this.Requires2FA = true;
+						this.Error = "Invalid authenticator code";
 					}
-
-					if (loginresponse.ContainsKey("message") == true)
-					{
-						this.Error = (string)loginresponse["message"];
-					}
-
 					return false;
 				}
-
-                // fixed OAuth
-                this.Session.SteamId = steamid;
-                this.Session.OAuthToken = auth;
-
-                // get the OAuth token
-                //  string oauth = (string)loginresponse["oauth"];
-				//var oauthjson = JObject.Parse(oauth);
-				//this.Session.OAuthToken = oauthjson.SelectToken("oauth_token").Value<string>();
-				//if (oauthjson.SelectToken("steamid") != null)
-				//{
-				//	this.Session.SteamId = oauthjson.SelectToken("steamid").Value<string>();
-				//}
-
-				//// perform UMQ login
-				//data.Clear();
-				//data.Add("access_token", this.Session.OAuthToken);
-				//response = GetString(API_LOGON, "POST", data);
-				//loginresponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(response);
-				//if (loginresponse.ContainsKey("umqid") == true)
-				//{
-				//	this.Session.UmqId = (string)loginresponse["umqid"];
-				//	if (loginresponse.ContainsKey("message") == true)
-				//	{
-				//		this.Session.MessageId = Convert.ToInt32(loginresponse["message"]);
-				//	}
-				//}
+				catch (SteamKit2.Authentication.AuthenticationException ex)
+				{
+					this.InvalidLogin = true;
+					if (ex.Result == SteamKit2.EResult.InvalidPassword)
+					{
+						this.Error = "Incorrect Login";
+					}
+					else if (ex.Result == SteamKit2.EResult.TwoFactorCodeMismatch)
+					{
+						this.Requires2FA = true;
+						this.Error = "Invalid authenticator code";
+					}
+					else
+					{
+						this.Error = ex.Message;
+					}
+					return false;
+				}
+				catch (Exception ex)
+				{
+					this.InvalidLogin = true;
+					this.Error = ex.Message;
+					return false;
+				}
 			}
 
 			return true;
+		}
+
+		private static string EmailDomainFrom(string email)
+		{
+			if (string.IsNullOrEmpty(email) == true)
+			{
+				return null;
+			}
+			int at = email.LastIndexOf('@');
+			if (at >= 0 && at < email.Length - 1)
+			{
+				return email.Substring(at + 1);
+			}
+			return email;
 		}
 
 		/// <summary>
@@ -650,14 +567,6 @@ namespace WinAuth
 			if (string.IsNullOrEmpty(this.Session.OAuthToken) == false)
 			{
 				PollConfirmationsStop();
-
-				if (string.IsNullOrEmpty(this.Session.UmqId) == false)
-				{
-					var data = new NameValueCollection();
-					data.Add("access_token", this.Session.OAuthToken);
-					data.Add("umqid", this.Session.UmqId);
-					GetString(API_LOGOFF, "POST", data);
-				}
 			}
 
 			Clear();
@@ -671,49 +580,39 @@ namespace WinAuth
 		{
 			try
 			{
-				var data = new NameValueCollection();
-				data.Add("access_token", this.Session.OAuthToken);
-				string response = GetString(API_GETWGTOKEN, "POST", data);
-				if (string.IsNullOrEmpty(response) == true)
+				if (string.IsNullOrEmpty(this.Session.OAuthToken) == true || string.IsNullOrEmpty(this.Session.SteamId) == true)
 				{
 					return false;
 				}
 
-				var json = JObject.Parse(response);
-				var token = json.SelectToken("response.token");
-				if (token == null)
-				{
-					return false;
-				}
-
-				var cookieuri = new Uri(COMMUNITY_BASE + "/");
-				this.Session.Cookies.Add(cookieuri, new Cookie("steamLogin", this.Session.SteamId + "||" + token.Value<string>()));
-
-				token = json.SelectToken("response.token_secure");
-				if (token == null)
-				{
-					return false;
-				}
-				this.Session.Cookies.Add(cookieuri, new Cookie("steamLoginSecure", this.Session.SteamId + "||" + token.Value<string>()));
-
-				// perform UMQ login
-				//response = GetString(API_LOGON, "POST", data);
-				//var loginresponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(response);
-				//if (loginresponse.ContainsKey("umqid") == true)
-				//{
-				//	this.Session.UmqId = (string)loginresponse["umqid"];
-				//	if (loginresponse.ContainsKey("message") == true)
-				//	{
-				//		this.Session.MessageId = Convert.ToInt32(loginresponse["message"]);
-				//	}
-				//}
-
+				ApplyCommunityCookies();
 				return true;
 			}
 			catch (Exception)
 			{
 				return false;
 			}
+		}
+
+		/// <summary>
+		/// Rebuild the community cookies from the saved access token.
+		/// </summary>
+		private void ApplyCommunityCookies()
+		{
+			string sessionId = null;
+			try
+			{
+				var existing = this.Session.Cookies.GetCookies(new Uri(COMMUNITY_BASE + "/"))["sessionid"];
+				if (existing != null)
+				{
+					sessionId = existing.Value;
+				}
+			}
+			catch (Exception)
+			{
+			}
+
+			this.Session.Cookies = SteamAuth.CreateCommunityCookies(this.Session.SteamId, this.Session.OAuthToken, sessionId);
 		}
 
 		/// <summary>
@@ -925,6 +824,8 @@ namespace WinAuth
 		/// <returns>list of Confirmation objects</returns>
 		public List<Confirmation> GetConfirmations()
 		{
+			ApplyCommunityCookies();
+
 			long servertime = (SteamAuthenticator.CurrentTime + this.Authenticator.ServerTimeDiff) / 1000L;
 
 			var jids = JObject.Parse(this.Authenticator.SteamData).SelectToken("identity_secret");
@@ -993,27 +894,40 @@ namespace WinAuth
             //}
 
             JObject confJson = JObject.Parse(html);
+            if (confJson["needauth"] != null && confJson["needauth"].Value<bool>() == true)
+            {
+                throw new UnauthorisedSteamRequestException();
+            }
             var confTrades = confJson["conf"];
-            if (confJson["success"].Value<bool>() == true && confTrades.Count() > 0)
+            if (confJson["success"] != null && confJson["success"].Value<bool>() == true && confTrades != null)
             {
                 foreach (var confTrade in confTrades)
                 {
                     var trade = new Confirmation();
 
-                    trade.Id = confTrade["id"].Value<string>();
-                    trade.Image = confTrade["icon"].Value<string>();
-                    trade.Key = confTrade["nonce"].Value<string>();
+                    trade.Id = confTrade["id"] != null ? confTrade["id"].Value<string>() : null;
+                    trade.Image = confTrade["icon"] != null ? confTrade["icon"].Value<string>() : null;
+                    trade.Key = confTrade["nonce"] != null ? confTrade["nonce"].Value<string>() : null;
 
+                    string headline = confTrade["headline"] != null ? confTrade["headline"].Value<string>() : string.Empty;
+                    string tradeType = confTrade["type_name"] != null ? confTrade["type_name"].Value<string>() : null;
+                    if (confTrade["summary"] != null && confTrade["summary"].Type == JTokenType.Array)
+                    {
+                        trade.Details = (tradeType ?? headline) + " - " + String.Join(Environment.NewLine, confTrade["summary"].Values<string>());
+                    }
+                    else
+                    {
+                        trade.Details = tradeType ?? headline;
+                    }
 
-                    string tradeType = confTrade["type_name"].Value<string>();
-                    trade.Details = tradeType + " - " + String.Join(Environment.NewLine, confTrade["summary"].Values<string>());
+                    trade.Traded = headline;
 
-                    trade.Traded = confTrade["headline"].Value<string>();
-
-                    long unixTimestamp = confTrade["creation_time"].Value<long>();
-                    DateTime dtDateTime = DateTimeOffset.FromUnixTimeSeconds(unixTimestamp).DateTime;
-                    string dateString = dtDateTime.ToString();
-                    trade.When = dateString;
+                    if (confTrade["creation_time"] != null)
+                    {
+                        long unixTimestamp = confTrade["creation_time"].Value<long>();
+                        DateTime dtDateTime = DateTimeOffset.FromUnixTimeSeconds(unixTimestamp).DateTime;
+                        trade.When = dtDateTime.ToString();
+                    }
 
                     trades.Add(trade);
                 }
@@ -1069,11 +983,13 @@ namespace WinAuth
 				string html = JObject.Parse(response).SelectToken("html").Value<string>();
 
 				Regex detailsRegex = new Regex(@"(.*<body[^>]*>\s*<div\s+class=""[^""]+"">).*(</div>.*?</body>\s*</html>)", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-				var match = detailsRegex.Match(this.ConfirmationsHtml);
+				var match = detailsRegex.Match(this.ConfirmationsHtml ?? string.Empty);
 				if (match.Success == true)
 				{
 					return match.Groups[1].Value + html + match.Groups[2].Value;
 				}
+
+				return "<html><head></head><body>" + html + "</body></html>";
 			}
 
 			return "<html><head></head><body><p>Cannot load trade confirmation details</p></body></html>";
@@ -1093,20 +1009,23 @@ namespace WinAuth
 				return false;
 			}
 
+			ApplyCommunityCookies();
+
 			long servertime = (SteamAuthenticator.CurrentTime + this.Authenticator.ServerTimeDiff) / 1000L;
 
 			var jids = JObject.Parse(this.Authenticator.SteamData).SelectToken("identity_secret");
 			string ids = (jids != null ? jids.Value<string>() : string.Empty);
-			var timehash = CreateTimeHash(servertime, "conf", ids);
+			string op = accept ? "allow" : "cancel";
+			var timehash = CreateTimeHash(servertime, op, ids);
 
 			var data = new NameValueCollection();
-			data.Add("op", accept ? "allow" : "cancel");
+			data.Add("op", op);
 			data.Add("p", this.Authenticator.DeviceId);
 			data.Add("a", this.Session.SteamId);
 			data.Add("k", timehash);
 			data.Add("t", servertime.ToString());
 			data.Add("m", "android");
-			data.Add("tag", "conf");
+			data.Add("tag", op);
 			//
 			data.Add("cid", id);
 			data.Add("ck", key);
@@ -1245,7 +1164,7 @@ namespace WinAuth
 				// call the server
 				HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
 				request.Method = method;
-				request.Accept = "text/javascript, text/html, application/xml, text/xml, */*";
+				request.Accept = "application/json, text/javascript;q=0.9, */*;q=0.5";
 				request.ServicePoint.Expect100Continue = false;
 				request.UserAgent = USERAGENT;
 				request.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;

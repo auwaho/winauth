@@ -57,6 +57,7 @@
     <PackageReference Include="HtmlRenderer.WinForms" Version="1.5.0.6" />
     <PackageReference Include="Newtonsoft.Json" Version="7.0.1" />
     <PackageReference Include="NLog" Version="4.7.15" />
+    <PackageReference Include="SteamKit2" Version="2.5.0" />
     <PackageReference Include="ZXing.Net" Version="0.14.0.1" />
     <Reference Include="BouncyCastle.Crypto">
       <HintPath>$(PkgBouncyCastle)\lib\Net40-Client\BouncyCastle.Crypto.dll</HintPath>
@@ -132,15 +133,19 @@
     <Compile Include="AuthenticatorListBox.cs" />
     <Compile Include="AuthenticatorListBox.Drawing.cs">
       <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="AuthenticatorListBox.Events.cs">
       <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="AuthenticatorListBox.Menu.cs">
       <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="AuthenticatorListBox.Renaming.cs">
       <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="BetaForm.cs">
       <SubType>Form</SubType>

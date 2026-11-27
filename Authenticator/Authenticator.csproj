@@ -41,6 +41,7 @@
       <ExcludeAssets>all</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Newtonsoft.Json" Version="7.0.1" />
+    <PackageReference Include="SteamKit2" Version="2.5.0" />
     <PackageReference Include="NLog" Version="4.7.15" />
     <Reference Include="BouncyCastle.Crypto">
       <HintPath>$(PkgBouncyCastle)\lib\Net40-Client\BouncyCastle.Crypto.dll</HintPath>
@@ -61,6 +62,7 @@
     <Compile Include="Base32.cs" />
     <Compile Include="OktaVerifyAuthenticator.cs" />
     <Compile Include="SteamClient.cs" />
+    <Compile Include="SteamAuth.cs" />
     <Compile Include="HIDDevice.cs" />
     <Compile Include="HOTPAuthenticator.cs" />
     <Compile Include="Properties\Resources.Designer.cs">

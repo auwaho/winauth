@@ -154,7 +154,7 @@ namespace WinAuth
 		{
 			if (activationcodeField.Text.Trim().Length == 0)
 			{
-				WinAuthForm.ErrorDialog(this, "Please enter the activation code from your email");
+				WinAuthForm.ErrorDialog(this, "Please enter the confirmation code");
 				this.DialogResult = System.Windows.Forms.DialogResult.None;
 				return;
 			}
@@ -815,6 +815,10 @@ namespace WinAuth
 
 							this.Authenticator.AuthenticatorData = m_steamAuthenticator;
 							revocationcodeField.Text = m_enroll.RevocationCode;
+							if (string.IsNullOrEmpty(m_enroll.ActivationMessage) == false)
+							{
+								confirmTabLabel.Text = m_enroll.ActivationMessage;
+							}
 
 							ShowTab("confirmTab");
 
