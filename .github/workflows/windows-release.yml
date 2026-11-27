@@ -1,0 +1,102 @@
+name: Publish Windows build
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: latest-build
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build and package WinAuth.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw 'MSBuild was not found.' }
+          & $msbuild WinAuth.sln /restore /p:Configuration=Release '/p:Platform=Any CPU' /m /v:m /nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $release = Join-Path (Get-Location) 'bin\Release'
+          $work = Join-Path $env:RUNNER_TEMP 'winauth-single'
+          $toolDir = Join-Path $env:RUNNER_TEMP 'ilrepack'
+          New-Item -ItemType Directory -Force -Path $work, $toolDir | Out-Null
+          $package = Join-Path $toolDir 'ilrepack.zip'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/ILRepack/2.0.33' -OutFile $package
+          Expand-Archive -Path $package -DestinationPath (Join-Path $toolDir 'pkg') -Force
+          $ilrepack = Join-Path $toolDir 'pkg\tools\ILRepack.exe'
+
+          $rsp = Join-Path $work 'merge.rsp'
+          $lines = New-Object System.Collections.Generic.List[string]
+          $lines.Add('/out:' + (Join-Path $work 'WinAuth.exe'))
+          $lines.Add('/target:winexe')
+          $lines.Add('/targetplatform:v4')
+          $lines.Add('/lib:' + $release)
+          $lines.Add('/lib:C:\Windows\Microsoft.NET\Framework64\v4.0.30319')
+          $lines.Add('/ndebug')
+          $lines.Add('/skipconfig')
+          $lines.Add('/parallel')
+          $lines.Add((Join-Path $release 'WinAuth.exe'))
+          Get-ChildItem -LiteralPath $release -Filter '*.dll' | ForEach-Object { $lines.Add($_.FullName) }
+          [System.IO.File]::WriteAllLines($rsp, $lines)
+          & $ilrepack "@$rsp"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $packed = Join-Path $work 'WinAuth.exe'
+          if (-not (Test-Path -LiteralPath $packed)) { throw 'Packed exe was not created.' }
+          $archive = Join-Path $env:RUNNER_TEMP 'WinAuth.zip'
+          if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive -Force }
+          Compress-Archive -Path $packed -DestinationPath $archive
+
+      - name: Update Latest Build
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $mainCommit = gh api "repos/$env:GH_REPO/commits/master" --jq '.sha'
+          if ($mainCommit -ne $env:GITHUB_SHA) {
+            Write-Host 'Skipping publication because master has advanced.'
+            exit 0
+          }
+
+          $tag = 'latest-build'
+          $archive = Join-Path $env:RUNNER_TEMP 'WinAuth.zip'
+          $notes = @"
+          GitHub Actions automatically updates this release after a successful build of master. This build is from commit $env:GITHUB_SHA.
+
+          The zip contains only WinAuth.exe. Extract it and run that file. Requires .NET Framework 4.8.
+          "@
+
+          $PSNativeCommandUseErrorActionPreference = $false
+          gh release view $tag --json isDraft *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          gh api "repos/$env:GH_REPO/git/ref/tags/$tag" *> $null
+          $tagExists = $LASTEXITCODE -eq 0
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          if ($releaseExists) {
+            gh release edit $tag --target $env:GITHUB_SHA --draft=true
+          } else {
+            gh release create $tag --target $env:GITHUB_SHA --draft --title '3.6.3' --notes $notes
+          }
+
+          gh release upload $tag $archive --clobber
+          if ($tagExists) {
+            gh api --method PATCH "repos/$env:GH_REPO/git/refs/tags/$tag" -f "sha=$env:GITHUB_SHA" -F 'force=true' --silent
+          } else {
+            gh api --method POST "repos/$env:GH_REPO/git/refs" -f "ref=refs/tags/$tag" -f "sha=$env:GITHUB_SHA" --silent
+          }
+          gh release edit $tag --target $env:GITHUB_SHA --title '3.6.3' --notes $notes --draft=false --latest
