@@ -1,23 +1,31 @@
-name: Publish Windows build
+name: Build Windows release
 
 on:
   push:
     branches: [master]
-
-concurrency:
-  group: latest-build
-  cancel-in-progress: false
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 jobs:
-  release:
+  build:
     runs-on: windows-2022
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Validate the version tag
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw 'Release tags must use vMAJOR.MINOR.PATCH without leading zeroes.'
+          }
 
       - name: Build and package WinAuth.exe
         shell: pwsh
@@ -27,7 +35,40 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-WindowsRelease.ps1 -ArchivePath (Join-Path $env:RUNNER_TEMP 'WinAuth.zip')
 
-      - name: Publish Latest Build
+      - name: Upload the tested WinAuth.zip
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ runner.temp }}/WinAuth.zip
+          if-no-files-found: error
+          archive: false
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: windows-version-release
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download the tested WinAuth.zip
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: ${{ runner.temp }}
+          skip-decompress: true
+          digest-mismatch: error
+
+      - name: Publish the versioned release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

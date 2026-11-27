@@ -29,3 +29,7 @@ On an interactive Windows test machine with a clean WinAuth profile, run the sam
 ```powershell
 ./scripts/Test-WindowsRelease.ps1 -ArchivePath ./artifacts/windows-release/WinAuth.zip
 ```
+
+## Publishing a version
+
+Push a tag in the form `vMAJOR.MINOR.PATCH` on the commit to release. For example, use `v3.6.4` for assembly version `3.6.4.0` in `WinAuth/WinAuth.csproj`. GitHub Actions builds and tests that commit, then publishes its archive. Pushes to `master` also build and test the archive and make it available as an Actions artifact.
