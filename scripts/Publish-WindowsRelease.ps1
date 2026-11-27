@@ -59,17 +59,19 @@ if ($state.release -and !$state.release.isDraft) {
     Write-Host "$tag was already published."
     return
 }
-if ($state.latestRelease -and !$state.latestRelease.isDraft -and !$state.latestRelease.isPrerelease -and
-    $state.latestRelease.tagName -cne $tag -and $state.latestRelease.name -in @($title, $tag)) {
-    Write-Host "Version $title is already published as $($state.latestRelease.tagName)."
+$previous = $state.latestRelease
+$hasPrevious = $previous -and !$previous.isDraft -and !$previous.isPrerelease -and $previous.tagName -and $previous.tagName -cne $tag
+$sameVersion = $hasPrevious -and $previous.name -in @($title, $tag)
+# A version tag may supersede a legacy release published under a commit tag.
+if ($sameVersion -and $previous.tagName -cnotmatch '^build-[0-9a-f]{40}$') {
+    Write-Host "Version $title is already published as $($previous.tagName)."
     return
 }
 
 $compare = ''
-if ($state.latestRelease -and !$state.latestRelease.isDraft -and !$state.latestRelease.isPrerelease -and
-    $state.latestRelease.tagName -and $state.latestRelease.tagName -cne $tag) {
-    $previousTag = $state.latestRelease.tagName
-    $previousName = if ($state.latestRelease.name) { $state.latestRelease.name } else { $previousTag }
+if ($hasPrevious -and !$sameVersion) {
+    $previousTag = $previous.tagName
+    $previousName = if ($previous.name) { $previous.name } else { $previousTag }
     $compareUrl = 'https://github.com/{0}/compare/{1}...{2}' -f $env:GH_REPO,
         [Uri]::EscapeDataString($previousTag), [Uri]::EscapeDataString($tag)
     $compare = "[View changes since $previousName]($compareUrl)"
