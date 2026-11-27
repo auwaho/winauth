@@ -26,9 +26,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-#if NETFX_4
 using System.Threading.Tasks;
-#endif
 using System.Windows.Forms;
 using MetroFramework.Controls;
 using WinAuth.Resources;
@@ -194,18 +192,14 @@ namespace WinAuth
 				yubikeyStatusLabel.Text = "Initialising YubiKey...";
 				yubikeyStatusLabel.Visible = true;
 
-#if NETFX_4
 				Task.Factory.StartNew(() =>
 				{
-#endif
 					if (this.Yubikey == null)
 					{
 						this.Yubikey = YubiKey.CreateInstance();
 					}
-#if NETFX_4
 				}).ContinueWith((task) =>
 				{
-#endif
 				if (string.IsNullOrEmpty(this.Yubikey.Info.Error) == false)
 					{
 						yubikeyStatusLabel.Text = this.Yubikey.Info.Error;
@@ -227,9 +221,7 @@ namespace WinAuth
 							(this.Yubikey.Info.Serial != 0 ? " (Serial " + this.Yubikey.Info.Serial + ")" : string.Empty));
 						yubiPanelIntro.Enabled = true;
 					}
-#if NETFX_4
 				}, TaskScheduler.FromCurrentSynchronizationContext());
-#endif
 			}
 			else
 			{

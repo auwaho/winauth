@@ -96,20 +96,10 @@ namespace WinAuth
 			StringBuilder diag = new StringBuilder();
 
 			Version version;
-#if NETFX_4
 			if (Version.TryParse(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion, out version) == true)
 			{
 				diag.Append("Version:" + version.ToString(4));
 			}
-#endif
-#if NETFX_3
-			try
-			{
-				version = new Version(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion);
-				diag.Append("Version:" + version.ToString(4));
-			}
-			catch (Exception) { }
-#endif
 
 			// add winauth log
 			try

@@ -130,6 +130,18 @@
       <DependentUpon>AddTrionAuthenticator.cs</DependentUpon>
     </Compile>
     <Compile Include="AuthenticatorListBox.cs" />
+    <Compile Include="AuthenticatorListBox.Drawing.cs">
+      <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+    </Compile>
+    <Compile Include="AuthenticatorListBox.Events.cs">
+      <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+    </Compile>
+    <Compile Include="AuthenticatorListBox.Menu.cs">
+      <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+    </Compile>
+    <Compile Include="AuthenticatorListBox.Renaming.cs">
+      <DependentUpon>AuthenticatorListBox.cs</DependentUpon>
+    </Compile>
     <Compile Include="BetaForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -261,9 +273,34 @@
     </Compile>
     <Compile Include="WinAPI.cs" />
     <Compile Include="WinAuthAuthenticator.cs" />
+    <Compile Include="WinAuthUpdater.cs" />
     <Compile Include="WinAuthConfig.cs" />
+    <Compile Include="WinAuthConfig.List.cs">
+      <DependentUpon>WinAuthConfig.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthConfig.Settings.cs">
+      <DependentUpon>WinAuthConfig.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthConfig.Xml.cs">
+      <DependentUpon>WinAuthConfig.cs</DependentUpon>
+    </Compile>
     <Compile Include="WinAuthForm.cs">
       <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="WinAuthForm.Config.cs">
+      <DependentUpon>WinAuthForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthForm.Events.cs">
+      <DependentUpon>WinAuthForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthForm.Hotkeys.cs">
+      <DependentUpon>WinAuthForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthForm.Menu.cs">
+      <DependentUpon>WinAuthForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="WinAuthForm.Steam.cs">
+      <DependentUpon>WinAuthForm.cs</DependentUpon>
     </Compile>
     <Compile Include="WinAuthForm.Designer.cs">
       <DependentUpon>WinAuthForm.cs</DependentUpon>
@@ -271,7 +308,6 @@
     <Compile Include="WinAuthMain.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="WinAuthHelper.cs" />
-    <Compile Include="WinAuthUpdater.cs" />
     <EmbeddedResource Include="AboutForm.resx">
       <DependentUpon>AboutForm.cs</DependentUpon>
     </EmbeddedResource>

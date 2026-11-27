@@ -95,11 +95,7 @@ namespace WinAuth
 		/// <summary>
 		/// Registry key value name for the last version we found when we checked
 		/// </summary>
-#if BETA
-		protected const string WINAUTHREGKEY_LATESTVERSION = WinAuthHelper.WINAUTHREGKEY + "\\LatestBetaVersion";
-#else
 		protected const string WINAUTHREGKEY_LATESTVERSION = WinAuthHelper.WINAUTHREGKEY + "\\LatestVersion";
-#endif
 
 		/// <summary>
 		/// The interval for checking new versions. Null is never, Zero is each time, else a period.
@@ -115,6 +111,11 @@ namespace WinAuth
 		/// When we last checked for a new version
 		/// </summary>
 		private DateTime _lastCheck;
+
+		/// <summary>
+		/// Version checks stay in the project, but do not contact the update server.
+		/// </summary>
+		private readonly bool _updatesEnabled = false;
 
 		/// <summary>
 		/// Current Config
@@ -142,20 +143,10 @@ namespace WinAuth
 			}
 
 			Version version;
-#if NETFX_4
 			if (Version.TryParse(Config.ReadSetting(WINAUTHREGKEY_LATESTVERSION, string.Empty), out version) == true)
 			{
 				_latestVersion = version;
 			}
-#endif
-#if NETFX_3
-			try
-			{
-				version = new Version(Config.ReadSetting(WINAUTHREGKEY_LATESTVERSION, string.Empty));
-				_latestVersion = version;
-			}
-			catch (Exception) { }
-#endif
 		}
 
 		#region Properties
@@ -194,22 +185,10 @@ namespace WinAuth
 			get
 			{
 				Version version;
-#if NETFX_4
 				if (Version.TryParse(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion, out version) == false)
 				{
 					throw new InvalidOperationException("Cannot get Assembly version information");
 				}
-#endif
-#if NETFX_3
-				try
-				{
-					version = new Version(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion);
-				}
-				catch (Exception)
-				{
-					throw new InvalidOperationException("Cannot get Assembly version information");
-				}
-#endif
 				return version;
 			}
 		}
@@ -294,6 +273,15 @@ namespace WinAuth
 		/// <returns>latest WinAuthVersionInfo or null if async</returns>
 		public virtual WinAuthVersionInfo GetLatestVersion(Action<WinAuthVersionInfo, bool, Exception> callback = null)
 		{
+			if (_updatesEnabled == false)
+			{
+				if (callback != null)
+				{
+					callback(null, true, null);
+				}
+				return null;
+			}
+
 			// get the update URL from the config else use the default
 			string updateUrl = WinAuthMain.WINAUTH_UPDATE_URL;
 			try
@@ -394,16 +382,7 @@ namespace WinAuth
 			var node = xml.SelectSingleNode("//version");
 
 			Version version = null;
-#if NETFX_4
 			Version.TryParse(node.InnerText, out version);
-#endif
-#if NETFX_3
-			try
-			{
-				version = new Version(FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion);
-			}
-			catch (Exception) { }
-#endif
 			if (node != null && version != null)
 			{
 				WinAuthVersionInfo latestversion = new WinAuthVersionInfo(version);
@@ -414,12 +393,7 @@ namespace WinAuth
 				{
 					latestversion.Released = released;
 				}
-#if NETFX_4
 				node = xml.SelectSingleNode("//url");
-#endif
-#if NETFX_3
-				node = xml.SelectSingleNode("//url35");
-#endif
 				if (node != null && string.IsNullOrEmpty(node.InnerText) == false)
 				{
 					latestversion.Url = node.InnerText;

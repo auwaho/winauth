@@ -81,9 +81,7 @@ namespace WinAuth
 				{
 					_mutex.ReleaseMutex();
 				}
-#if NETFX_4
 				_mutex.Dispose();
-#endif
 			}
 		}
 	}
