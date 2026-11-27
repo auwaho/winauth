@@ -18,6 +18,6 @@ The difference from the original is in the repository header, and in full in the
 
 Existing `%AppData%\WinAuth\winauth.xml` files still open.
 
-The [latest release](https://github.com/auwaho/winauth/releases/latest) is an automatic release build. GitHub Actions creates it when code is pushed to `master`. The zip contains only `WinAuth.exe`.
+GitHub Actions builds and tests the release on pushes to `master`. The zip contains only `WinAuth.exe`, with its bundled translations. Download it from the [latest release](https://github.com/auwaho/winauth/releases/latest).
 
 Running it requires [.NET Framework 4.8](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48). To build from source, open `WinAuth.sln`. See [COMPILING.md](COMPILING.md).

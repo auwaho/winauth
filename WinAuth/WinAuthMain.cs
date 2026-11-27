@@ -183,6 +183,34 @@ namespace WinAuth
 
 		public static ILogger Logger;
 
+		static WinAuthMain()
+		{
+			AppDomain.CurrentDomain.AssemblyResolve += ResolveTranslationAssembly;
+		}
+
+		private static Assembly ResolveTranslationAssembly(object sender, ResolveEventArgs args)
+		{
+			var name = new AssemblyName(args.Name);
+			if (name.Name != "WinAuth.resources" || string.IsNullOrEmpty(name.CultureName))
+			{
+				return null;
+			}
+
+			string resourceName = "WinAuth.Translations." + name.CultureName + ".dll";
+			using (Stream resource = typeof(WinAuthMain).Assembly.GetManifestResourceStream(resourceName))
+			{
+				if (resource == null)
+				{
+					return null;
+				}
+
+				using (var reader = new BinaryReader(resource))
+				{
+					return Assembly.Load(reader.ReadBytes(checked((int)resource.Length)));
+				}
+			}
+		}
+
 		/// <summary>
 		/// The main entry point for the application.
 		/// </summary>
