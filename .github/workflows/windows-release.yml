@@ -37,18 +37,49 @@ jobs:
           Expand-Archive -Path $package -DestinationPath (Join-Path $toolDir 'pkg') -Force
           $ilrepack = Join-Path $toolDir 'pkg\tools\ILRepack.exe'
 
+          $stage = Join-Path $work 'stage'
+          Copy-Item -LiteralPath $release -Destination $stage -Recurse
+          $cecilZip = Join-Path $toolDir 'cecil.zip'
+          Invoke-WebRequest -Uri 'https://www.nuget.org/api/v2/package/Mono.Cecil/0.11.5' -OutFile $cecilZip
+          Expand-Archive -Path $cecilZip -DestinationPath (Join-Path $toolDir 'cecil') -Force
+          $cecil = Join-Path $toolDir 'cecil\lib\net40\Mono.Cecil.dll'
+          Copy-Item -LiteralPath $cecil -Destination (Join-Path $toolDir 'Mono.Cecil.dll') -Force
+          $stripCs = Join-Path $toolDir 'StripResource.cs'
+          Set-Content -LiteralPath $stripCs -Encoding ASCII -Value @(
+            'using Mono.Cecil;',
+            'class StripResource {',
+            '  static void Main(string[] args) {',
+            '    var asm = AssemblyDefinition.ReadAssembly(args[0]);',
+            '    var resources = asm.MainModule.Resources;',
+            '    for (int i = resources.Count - 1; i >= 0; i--) {',
+            '      if (resources[i].Name == "WinAuth.Properties.Resources.resources")',
+            '        resources.RemoveAt(i);',
+            '    }',
+            '    asm.Write(args[1]);',
+            '  }',
+            '}'
+          )
+          $stripExe = Join-Path $toolDir 'StripResource.exe'
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /out:$stripExe /r:$cecil $stripCs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $auth = Join-Path $stage 'Authenticator.dll'
+          $stripped = Join-Path $stage 'Authenticator.stripped.dll'
+          & $stripExe $auth $stripped
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item -LiteralPath $stripped -Destination $auth -Force
+
           $rsp = Join-Path $work 'merge.rsp'
           $lines = New-Object System.Collections.Generic.List[string]
           $lines.Add('/out:' + (Join-Path $work 'WinAuth.exe'))
           $lines.Add('/target:winexe')
           $lines.Add('/targetplatform:v4')
-          $lines.Add('/lib:' + $release)
+          $lines.Add('/lib:' + $stage)
           $lines.Add('/lib:C:\Windows\Microsoft.NET\Framework64\v4.0.30319')
           $lines.Add('/ndebug')
           $lines.Add('/skipconfig')
           $lines.Add('/parallel')
-          $lines.Add((Join-Path $release 'WinAuth.exe'))
-          Get-ChildItem -LiteralPath $release -Filter '*.dll' | ForEach-Object { $lines.Add($_.FullName) }
+          $lines.Add((Join-Path $stage 'WinAuth.exe'))
+          Get-ChildItem -LiteralPath $stage -Filter '*.dll' | ForEach-Object { $lines.Add($_.FullName) }
           [System.IO.File]::WriteAllLines($rsp, $lines)
           & $ilrepack "@$rsp"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
