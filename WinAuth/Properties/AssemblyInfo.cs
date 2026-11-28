@@ -9,7 +9,7 @@ using System.Resources;
 [assembly: AssemblyTitle("WinAuth")]
 [assembly: AssemblyDescription("WinAuth - The Windows Authenticator")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("WinAuth")]
 [assembly: AssemblyProduct("WinAuth")]
 [assembly: AssemblyCopyright("Copyright © 2016. Colin Mackie. All rights reserved.")]
 [assembly: AssemblyTrademark("")]

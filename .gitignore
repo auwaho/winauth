@@ -29,6 +29,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Local documentation
+/docs/
+
 # C++
 ipch/
 *.aps

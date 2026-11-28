@@ -22,14 +22,27 @@ From the repository root, run this command in PowerShell 7.
 ./scripts/Build-WindowsRelease.ps1 -OutputDirectory ./artifacts/windows-release
 ```
 
-This builds `artifacts/windows-release/WinAuth.zip` with one `WinAuth.exe` containing its dependencies and translations. The script downloads ILRepack from NuGet.
+This builds `artifacts/windows-release/WinAuth.zip` from the standard Release output of `WinAuth.sln`. It includes `WinAuth.exe`, its configuration, the dependency DLLs, and the translation folders.
 
-On an interactive Windows test machine with a clean WinAuth profile, run the same startup check used in CI.
+GitHub Actions runs the same script on pushes to `master` and version tags.
+
+## Checking the release archive
+
+Run the smoke test from the repository root on a clean Windows profile.
 
 ```powershell
 ./scripts/Test-WindowsRelease.ps1 -ArchivePath ./artifacts/windows-release/WinAuth.zip
 ```
 
+The smoke test checks the required files and the absence of PDBs, then starts WinAuth from a freshly extracted folder. For a tagged build, add `-VersionTag v3.6.4` to check the executable version.
+
 ## Publishing a version
 
-Push a tag in the form `vMAJOR.MINOR.PATCH` on the commit to release. For example, use `v3.6.4` for assembly version `3.6.4.0` in `WinAuth/WinAuth.csproj`. GitHub Actions builds and tests that commit, then publishes its archive. Pushes to `master` also build and test the archive and make it available as an Actions artifact.
+Set the version in `WinAuth/WinAuth.csproj`, `WinAuth/Properties/AssemblyInfo.cs`, and `WinAuth/Properties/app.manifest`, then commit those changes. For version `3.6.4.0`, push the tag `v3.6.4` on that commit.
+
+```text
+git tag v3.6.4
+git push origin refs/tags/v3.6.4
+```
+
+The tag workflow checks the version, builds the standard Release ZIP, and publishes it to GitHub Releases.

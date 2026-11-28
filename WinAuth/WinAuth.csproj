@@ -538,19 +538,6 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- ILRepack merges this resource-only input into the single-file release. -->
-  <Target Name="EmbedWinAuthTranslationAssemblies" AfterTargets="CreateSatelliteAssemblies"
-          Condition="'$(EmbedWinAuthTranslations)' == 'true'">
-    <ItemGroup>
-      <_WinAuthTranslation Include="@(IntermediateSatelliteAssembliesWithTargetPath)">
-        <LogicalName>WinAuth.Translations.%(IntermediateSatelliteAssembliesWithTargetPath.Culture).dll</LogicalName>
-      </_WinAuthTranslation>
-    </ItemGroup>
-    <AL OutputAssembly="$(OutDir)WinAuth.Translations.dll" TargetType="library"
-        EmbedResources="@(_WinAuthTranslation)" SdkToolsPath="$(TargetFrameworkSDKToolsDirectory)">
-      <Output TaskParameter="OutputAssembly" ItemName="FileWrites" />
-    </AL>
-  </Target>
   <PropertyGroup>
     <PostBuildEvent>
     </PostBuildEvent>

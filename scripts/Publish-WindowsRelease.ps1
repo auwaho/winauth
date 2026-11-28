@@ -61,15 +61,9 @@ if ($state.release -and !$state.release.isDraft) {
 }
 $previous = $state.latestRelease
 $hasPrevious = $previous -and !$previous.isDraft -and !$previous.isPrerelease -and $previous.tagName -and $previous.tagName -cne $tag
-$sameVersion = $hasPrevious -and $previous.name -in @($title, $tag)
-# A version tag may supersede a legacy release published under a commit tag.
-if ($sameVersion -and $previous.tagName -cnotmatch '^build-[0-9a-f]{40}$') {
-    Write-Host "Version $title is already published as $($previous.tagName)."
-    return
-}
 
 $compare = ''
-if ($hasPrevious -and !$sameVersion) {
+if ($hasPrevious) {
     $previousTag = $previous.tagName
     $previousName = if ($previous.name) { $previous.name } else { $previousTag }
     $compareUrl = 'https://github.com/{0}/compare/{1}...{2}' -f $env:GH_REPO,
@@ -78,7 +72,7 @@ if ($hasPrevious -and !$sameVersion) {
 }
 $footer = 'This release was built and published automatically by GitHub Actions from commit `{0}` at tag `{1}`.' -f
     $commit.Substring(0, 7), $tag
-$overview = 'WinAuth {0} for Windows. Download `WinAuth.zip`, extract it, and run `WinAuth.exe`. Requires .NET Framework 4.8.' -f $title
+$overview = 'WinAuth {0} for Windows. Download `WinAuth.zip`, extract the entire archive into one folder, and run `WinAuth.exe` from that folder. Keep the supporting DLL and config files alongside the executable. Requires .NET Framework 4.8.' -f $title
 $notes = (@($overview, $compare, $footer) | Where-Object { $_ }) -join "`n`n"
 
 if ($state.release) {

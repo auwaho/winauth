@@ -27,15 +27,20 @@ jobs:
             throw 'Release tags must use vMAJOR.MINOR.PATCH without leading zeroes.'
           }
 
-      - name: Build and package WinAuth.exe
+      - name: Build and package WinAuth
         shell: pwsh
         run: ./scripts/Build-WindowsRelease.ps1 -OutputDirectory $env:RUNNER_TEMP
 
-      - name: Verify the single-file release
+      - name: Smoke-test WinAuth.zip
         shell: pwsh
-        run: ./scripts/Test-WindowsRelease.ps1 -ArchivePath (Join-Path $env:RUNNER_TEMP 'WinAuth.zip')
+        run: |
+          $smoke = @{ ArchivePath = (Join-Path $env:RUNNER_TEMP 'WinAuth.zip') }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $smoke.VersionTag = $env:GITHUB_REF_NAME
+          }
+          ./scripts/Test-WindowsRelease.ps1 @smoke
 
-      - name: Upload the tested WinAuth.zip
+      - name: Upload WinAuth.zip
         id: upload
         uses: actions/upload-artifact@v7
         with:
@@ -60,7 +65,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Download the tested WinAuth.zip
+      - name: Download WinAuth.zip
         uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ needs.build.outputs.artifact-id }}

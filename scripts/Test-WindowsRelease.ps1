@@ -5,7 +5,8 @@ Only this invocation's process and temporary directory are cleaned up. #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string] $ArchivePath,
-    [ValidateRange(5, 120)][int] $TimeoutSeconds = 30
+    [ValidateRange(5, 120)][int] $TimeoutSeconds = 30,
+    [ValidatePattern('^v[0-9]+\.[0-9]+\.[0-9]+$')][string] $VersionTag
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -13,21 +14,27 @@ if (-not $IsWindows) { throw 'This smoke test requires Windows and PowerShell 7.
 $archivePath = (Get-Item -LiteralPath $ArchivePath).FullName
 $archive = [IO.Compression.ZipFile]::OpenRead($archivePath)
 try {
-    if ($archive.Entries.Count -ne 1 -or $archive.Entries[0].FullName -cne 'WinAuth.exe') {
-        throw 'Release ZIP must contain exactly one root entry named WinAuth.exe.'
+    # Project outputs and the directly referenced runtime libraries belong at
+    # the ZIP root, alongside the binding redirects in WinAuth.exe.config.
+    $requiredFiles = @(
+        'WinAuth.exe', 'WinAuth.exe.config', 'Authenticator.dll',
+        'InputSimulator.dll', 'MetroFramework.dll', 'BouncyCastle.Crypto.dll',
+        'ICSharpCode.SharpZipLib.dll', 'HtmlRenderer.dll', 'HtmlRenderer.WinForms.dll',
+        'Newtonsoft.Json.dll', 'NLog.dll', 'SteamKit2.dll', 'zxing.dll'
+    )
+    foreach ($requiredFile in $requiredFiles) {
+        $entries = @($archive.Entries | Where-Object { $_.FullName -ceq $requiredFile })
+        if ($entries.Count -ne 1) { throw "Release ZIP must contain exactly one root entry named $requiredFile." }
+        if ($entries[0].Length -eq 0) { throw "$requiredFile in the release ZIP is empty." }
     }
-    if ($archive.Entries[0].Length -eq 0) { throw 'WinAuth.exe in the release ZIP is empty.' }
+    foreach ($entry in $archive.Entries) {
+        if ($entry.Name -like '*.pdb') { throw "Release ZIP contains debug symbols: $($entry.FullName)." }
+    }
 } finally { $archive.Dispose() }
-
-if (Get-Process -Name WinAuth -ErrorAction SilentlyContinue) { throw 'A WinAuth process is already running.' }
-$appData = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
-if (-not $appData -or (Test-Path -LiteralPath (Join-Path $appData 'WinAuth')) -or
-    (Test-Path -LiteralPath 'HKCU:\Software\WinAuth') -or (Test-Path -LiteralPath 'HKCU:\Software\WinAuth3')) {
-    throw 'Use a clean Windows profile: existing WinAuth application data/registry settings will not be modified.'
-}
 
 # A matching title alone could be an error dialog. Require an enabled,
 # responding WinForms main window and reject other visible titled windows.
+# ExceptionForm is titled "WinAuth Error" and is rejected by these checks.
 # Native window checks also work without UI Automation or an input desktop.
 if ($null -eq ('WinAuthReleaseSmoke.WindowProbe' -as [type])) {
     Add-Type -TypeDefinition @'
@@ -70,7 +77,26 @@ $smokeRoot = Join-Path $tempParent ('WinAuth-release-smoke-' + [Guid]::NewGuid()
 $process = $null
 try {
     [IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $smokeRoot)
-    $startInfo = [Diagnostics.ProcessStartInfo]::new((Join-Path $smokeRoot 'WinAuth.exe'))
+    $exePath = Join-Path $smokeRoot 'WinAuth.exe'
+    if ($VersionTag) {
+        $expectedVersion = [version] $VersionTag.Substring(1)
+        $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($exePath).Version
+        $fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+        $managedReleaseVersion = [version]::new($assemblyVersion.Major, $assemblyVersion.Minor, $assemblyVersion.Build)
+        $fileReleaseVersion = [version]::new($fileVersion.FileMajorPart, $fileVersion.FileMinorPart, $fileVersion.FileBuildPart)
+        if ($managedReleaseVersion -ne $expectedVersion -or $fileReleaseVersion -ne $expectedVersion) {
+            throw "WinAuth.exe versions do not match ${VersionTag}: managed $managedReleaseVersion; file $fileReleaseVersion."
+        }
+    }
+
+    if (Get-Process -Name WinAuth -ErrorAction SilentlyContinue) { throw 'A WinAuth process is already running.' }
+    $appData = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
+    if (-not $appData -or (Test-Path -LiteralPath (Join-Path $appData 'WinAuth')) -or
+        (Test-Path -LiteralPath 'HKCU:\Software\WinAuth') -or (Test-Path -LiteralPath 'HKCU:\Software\WinAuth3')) {
+        throw 'Use a clean Windows profile: existing WinAuth application data/registry settings will not be modified.'
+    }
+
+    $startInfo = [Diagnostics.ProcessStartInfo]::new($exePath)
     $startInfo.UseShellExecute = $false
     $startInfo.WorkingDirectory = $smokeRoot
     $process = [Diagnostics.Process]::Start($startInfo)
@@ -97,9 +123,9 @@ try {
         }
     } finally {
         $cleanupPath = [IO.Path]::GetFullPath($smokeRoot)
-        if (-not $cleanupPath.StartsWith($tempParent, [StringComparison]::OrdinalIgnoreCase) -or
+        if ([IO.Path]::GetDirectoryName($cleanupPath) -ne [IO.Path]::TrimEndingDirectorySeparator($tempParent) -or
             [IO.Path]::GetFileName($cleanupPath) -notmatch '^WinAuth-release-smoke-[0-9a-f]{32}$') { throw 'Invalid smoke cleanup path.' }
         if (Test-Path -LiteralPath $cleanupPath) { Remove-Item -LiteralPath $cleanupPath -Recurse -Force }
     }
 }
-Write-Host 'PASS: ZIP contains only root WinAuth.exe; its main window started from a clean directory/profile.'
+Write-Host 'PASS: Release ZIP contains the required root binaries/configuration and no PDBs; WinAuth main window started from a clean directory/profile.'
